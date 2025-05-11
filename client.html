@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Room Chat Client</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f6fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            height: 90vh;
+        }
+
+        /* Room List Styles */
+        .room-list {
+            width: 280px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+
+        .room-header {
+            font-size: 1.4rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .room-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .room-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .room-item.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .user-count {
+            background: #3498db;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        /* Chat Area Styles */
+        .chat-area {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .room-indicator {
+            padding: 15px 20px;
+            background: #3498db;
+            color: white;
+            border-radius: 12px 12px 0 0;
+            font-weight: bold;
+        }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .message-system {
+            background: #fff3cd;
+            color: #856404;
+            font-style: italic;
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .message-time {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+
+        .message-text {
+            color: #34495e;
+            line-height: 1.4;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 2px solid #ecf0f1;
+            display: flex;
+            gap: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        #message-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .modal h2 {
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Server Connection Modal -->
+    <div id="server-modal" class="modal">
+        <div class="modal-content">
+            <h2>Connect to Server</h2>
+            <input type="text" 
+                   id="server-ip" 
+                   placeholder="Enter server IP"
+                   value="">
+            <button onclick="connectToServer()">Connect</button>
+        </div>
+    </div>
+
+    <!-- Username Modal -->
+    <div id="username-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Choose Your Username</h2>
+            <input type="text" 
+                   id="username-input" 
+                   placeholder="Enter username"
+                   maxlength="20">
+            <button onclick="setUsername()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Main Chat Interface -->
+    <div class="container hidden">
+        <!-- Room List -->
+        <div class="room-list">
+            <div class="room-header">Chat Rooms</div>
+            <div id="rooms-container"></div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="room-indicator">
+                Current Room: <span id="current-room-name">Not Selected</span>
+            </div>
+            
+            <div id="messages"></div>
+            
+            <div class="input-area">
+                <input type="text" 
+                       id="message-input" 
+                       placeholder="Type your message..."
+                       onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentRoom = null;
+        let username = null;
+
+        // Connection Management
+        function connectToServer() {
+            const serverIp = document.getElementById('server-ip').value.trim();
+            if (!serverIp) return alert('Please enter server IP address');
+
+            // Initialize Socket.IO connection
+            socket = io(`http://${serverIp}:5000`, {
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                timeout: 2000
+            });
+
+            // Connection Event Handlers
+            socket.on('connect', () => {
+                document.getElementById('server-modal').classList.add('hidden');
+                document.getElementById('username-modal').classList.remove('hidden');
+            });
+
+            socket.on('connect_error', (error) => {
+                alert(`Connection failed: ${error.message}`);
+                document.getElementById('server-modal').classList.remove('hidden');
+            });
+
+            // Application Event Handlers
+            socket.on('room_list', updateRoomList);
+            socket.on('receive_message', displayUserMessage);
+            socket.on('system_message', displaySystemMessage);
+            socket.on('room_update', updateRoomStatus);
+        }
+
+        // User Authentication
+        function setUsername() {
+            username = document.getElementById('username-input').value.trim();
+            if (!username) return alert('Please enter a username');
+            
+            document.getElementById('username-modal').classList.add('hidden');
+            document.querySelector('.container').classList.remove('hidden');
+        }
+
+        // Room Management
+        function joinRoom(roomName) {
+            if (!socket || !username) return;
+            
+            // Clear previous room messages
+            document.getElementById('messages').innerHTML = '';
+            currentRoom = roomName;
+            document.getElementById('current-room-name').textContent = roomName;
+            
+            socket.emit('join_room', {
+                room_name: roomName,
+                username: username
+            });
+        }
+
+        // Message Handling
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (message && currentRoom && socket) {
+                socket.emit('send_message', { text: message });
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        // UI Updates
+        function updateRoomList(rooms) {
+            const container = document.getElementById('rooms-container');
+            container.innerHTML = Object.values(rooms).map(room => `
+                <div class="room-item ${room.name === currentRoom ? 'active' : ''}" 
+                     onclick="joinRoom('${room.name}')">
+                    <span>${room.name}</span>
+                    <span class="user-count">${room.count}</span>
+                </div>
+            `).join('');
+        }
+
+        function displayUserMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="message-sender">${message.sender}</span>
+                    <span class="message-time">${formatTime(message.timestamp)}</span>
+                </div>
+                <div class="message-text">${message.text}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function displaySystemMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            
+            const systemDiv = document.createElement('div');
+            systemDiv.className = 'message message-system';
+            systemDiv.innerHTML = `
+                <div class="message-text">${message.text}</div>
+                <div class="message-time">${formatTime(message.timestamp)}</div>
+            `;
+            
+            messagesDiv.appendChild(systemDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateRoomStatus(rooms) {
+            document.querySelectorAll('.room-item').forEach(item => {
+                const roomName = item.querySelector('span:first-child').textContent;
+                const room = rooms[roomName];
+                
+                if (room) {
+                    item.querySelector('.user-count').textContent = room.count;
+                    item.classList.toggle('active', roomName === currentRoom);
+                }
+            });
+        }
+
+        // Helper Functions
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+    </script>
+</body>
+</html>
