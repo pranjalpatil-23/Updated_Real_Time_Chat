@@ -62,7 +62,7 @@ $env:SECRET_KEY = "your-secure-secret"
 Start the Flask-SocketIO server:
 
 ```bash
-python app.py
+python server.py
 ```
 
 By default, the server listens on `0.0.0.0:5000`. Adjust in `app.py`:
@@ -93,7 +93,7 @@ socketio.run(app, host='0.0.0.0', port=5000, debug=True)
 ## Project Structure
 
 ```
-├── app.py            # Main Flask-SocketIO server
+├── server.py            # Main Flask-SocketIO server
 ├── client.html       # Frontend UI and Socket.IO client script
 ├── requirements.txt  # Python dependency list
 └── README.md         # Project documentation
