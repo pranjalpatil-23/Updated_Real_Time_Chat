@@ -65,7 +65,7 @@ Start the Flask-SocketIO server:
 python server.py
 ```
 
-By default, the server listens on `0.0.0.0:5000`. Adjust in `app.py`:
+By default, the server listens on `0.0.0.0:5000`. Adjust in `server.py`:
 
 ```python
 socketio.run(app, host='0.0.0.0', port=5000, debug=True)
@@ -106,6 +106,6 @@ A simple demo app to illustrate real-time WebSocket communication with Flask.
 ## Resources
 
 * [Client Code](client.html)
-* [Server Code](app.py)
+* [Server Code](server.py)
 
 ---
